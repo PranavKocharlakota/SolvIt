@@ -74,8 +74,8 @@ HackHayward/
 
 ### Prerequisites
 - Node.js 16+ (for frontend)
-- Python 3.8+ (for backend)
-- Groq API key (get it at https://console.groq.com)
+- Python 3.12+ (for backend) - uses numpy 2.0+
+- Groq API key (get it at https://console.groq.com/keys)
 
 ### Installation
 
@@ -83,13 +83,19 @@ HackHayward/
 ```bash
 cd backend_py
 
-# Activate virtual environment
-source .venv/Scripts/activate  # bash/git bash
-# or
-.\.venv\Scripts\activate       # PowerShell
+# Create virtual environment (first time)
+python -m venv .venv
 
-# Verify environment file
-cat .env  # Should have GROQ_API_KEY and PORT=3002
+# Activate virtual environment
+source .venv/bin/activate      # bash/git bash/macOS
+# or
+.\.venv\Scripts\activate       # PowerShell/Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env from example
+cp .env.example .env  # Update with your GROQ_API_KEY
 ```
 
 #### Frontend Setup
@@ -108,10 +114,10 @@ npm run build  # Should compile without errors
 #### Terminal 1: Start Backend
 ```bash
 cd backend_py
-source .venv/Scripts/activate
+source .venv/bin/activate      # or .\.venv\Scripts\activate on Windows
 python run.py
 ```
-Backend runs on `http://localhost:3002`
+Backend runs on `http://localhost:3002` (or set PORT in .env)
 
 #### Terminal 2: Start Frontend
 ```bash
@@ -119,6 +125,8 @@ cd frontend
 npm run dev
 ```
 Frontend opens on `http://localhost:5173`
+
+**First Time Setup:** The frontend proxy automatically forwards `/api` requests to the backend.
 
 ## API Endpoints
 
@@ -212,10 +220,11 @@ WS /ws
 ## Features
 
 ### Canvas Interaction
-- **Drawing Tools:** Pen, arrow, eraser, text, select
+- **Drawing Tools:** Pen, marker, magic eraser (click and drag to erase elements)
+- **Shapes:** Circle, rectangle, triangle, line, arrow, diamond, star
 - **Canvas Modes:** Chalkboard, grid, paper
 - **Customization:** Brush size, colors, opacity, highlighters
-- **Real-time Recognition:** Instant feedback as you draw
+- **Real-time Recognition:** Instant feedback as you draw with live description pill
 
 ### Math Recognition
 - Recognizes handwritten math expressions
@@ -266,13 +275,22 @@ npx tsc --noEmit
 
 ### Backend Environment (`.env`)
 ```env
-GROQ_API_KEY=your_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 PORT=3002
 ```
+
+**Note:** Use `.env.example` as a template, never commit `.env` files.
 
 ### Frontend Configuration (`vite.config.ts`)
 - Dev server: `localhost:5173`
 - API proxy: `http://localhost:3002/api`
+- Auto-proxies `/api/*` requests to backend
+
+### Vite Build Output
+```bash
+npm run build  # Creates optimized frontend in dist/
+npm run preview  # Test production build locally
+```
 
 ## Troubleshooting
 
@@ -306,18 +324,43 @@ npm run build  # Check for compilation errors
 npx tsc --noEmit
 ```
 
-## Recent Fixes
+## Deployment
 
-### Fixed Issues
-1. **KaTeX CSS Import** - Missing dependency installed
-2. **Konva Module Resolution** - Fresh npm install resolved issues
-3. **Frontend File Naming** - All source files renamed to match imports
+### Deploy to Render
 
-### Current Status
-- ✅ Frontend builds successfully
-- ✅ Backend imports work correctly
-- ✅ All API endpoints functional
-- ✅ Ready for development
+#### Static Frontend + Backend Web Service
+
+**Build Commands:**
+- Backend: `pip install --upgrade pip setuptools wheel && pip install -r backend_py/requirements.txt --only-binary :all:`
+- Frontend: `npm install --prefix frontend && npm run build --prefix frontend`
+
+**Environment Variables:**
+- `GROQ_API_KEY` - Your Groq API key (backend only)
+
+**Services:**
+- Backend: Web Service running `cd backend_py && uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- Frontend: Static Site from `frontend/dist` with `/api` proxy to backend
+
+See `render.yaml` for blueprint configuration.
+
+## Recent Improvements
+
+### UI/UX
+- ✅ Magic eraser: Click and drag to erase elements continuously
+- ✅ Button highlighting: Pen/marker buttons don't highlight when eraser is active
+- ✅ Responsive spacing: Improved readability and visual hierarchy
+- ✅ Formula boxes: Dark text rendering with proper styling
+
+### System
+- ✅ Confidence-aware responses: AI avoids overconfidence
+- ✅ Auto-context management: Recognition updates on drawing changes
+- ✅ Brief responses: Simple problems get 1-sentence answers
+- ✅ Multi-step derivations: Complex math shows numbered steps with equations
+
+### Dependencies
+- ✅ Python 3.12+ compatible (numpy 2.0+, Pillow 10.0+)
+- ✅ Cleaned up .gitignore (removed 2600+ tracked node_modules)
+- ✅ Environment files excluded from version control
 
 ## Performance Tips
 
@@ -361,7 +404,16 @@ For issues or questions:
 3. Check browser console for errors
 4. Verify backend is running on port 3002
 
+## Git Workflow
+
+- ✅ `.gitignore` properly configured to exclude dependencies and secrets
+- ✅ Frontend: `npm install` creates clean local node_modules (not tracked)
+- ✅ Backend: `.env` and `.env.example` in root (example is public, .env is private)
+- ✅ Commits are clean with meaningful messages and co-author attributions
+
 ---
 
-**Last Updated:** March 2025
+**Last Updated:** March 2026
 **Status:** Production Ready ✅
+**Python:** 3.12+ compatible
+**Node:** 16+
