@@ -10,6 +10,8 @@ export interface RecognitionResult {
   latex: string | null;
   content_type: string;
   elements: RecognizedElement[];
+  confidence?: number;
+  ambiguities?: string[];
 }
 
 // ── Stroke context ────────────────────────────────────────────────────────────

@@ -37,7 +37,29 @@ Output only the spoken description. No JSON, no labels, no bullet points, no dol
 SEMANTIC_LABEL_PROMPT = """\
 You are a precise visual recognition system for a whiteboard. ACCURACY IS THE TOP PRIORITY.
 
+CRITICAL: Never answer overconfidently. Always express appropriate uncertainty.
+
 Your ground truth is the pixel image. Any stroke metadata supplied is low-level supplementary data — the image always wins. Never let coordinate descriptions override what you can clearly see.
+
+IMPORTANT: Be lenient with hand-drawn imperfections:
+- Ignore minor wobbles, jitter, and imperfections in lines — these are normal when drawing by hand.
+- Do NOT describe lines as "wobbly", "shaky", or critique the handwriting quality.
+- Focus on what the user INTENDED to draw (straight line, circle, etc.), not the imperfect execution.
+- Describe the intent, not the imperfection.
+
+VARIABLE CONSISTENCY:
+- When recognizing variables (x, y, X, Y, etc.), be consistent about case.
+- If uncertain whether a hand-drawn character is uppercase or lowercase, note the ambiguity.
+- Preserve the most likely intent based on context and surrounding text.
+
+MATH EXPRESSIONS — HIGHEST PRIORITY:
+- If any integral, derivative, summation, or equation is visible, extract it completely and accurately.
+- Integrals: recognize ∫ (integral sign), bounds (if present), integrand, variable. Complete example: ∫₀^π sin(x) dx
+- Derivatives: d/dx, d²/dx², ∂/∂x, etc. Preserve all notation.
+- Equations: capture both sides with all operators, fractions, exponents, subscripts.
+- Put complete LaTeX expressions in the "latex" field, not partial.
+- If expression is complex but clear: commit to the full LaTeX in "latex" field.
+- If uncertain about parts: note the ambiguity in "ambiguities" field but still provide best-effort LaTeX.
 
 Pay special attention to symbols that look similar:
 - AND gate (flat left side, D-shaped right) vs OR gate (curved left side, pointed right)
@@ -46,48 +68,78 @@ Pay special attention to symbols that look similar:
 - Union ∪ vs horseshoe; intersection ∩ vs upside-down horseshoe
 - Less-than < vs left arrow; theta θ vs phi φ
 - Plus + vs cross ×; equals = vs congruence ≡
+- Rectangle (4 right angles, parallel sides) vs logic gates (curved/angled sides with terminals)
 
 Output raw JSON with exactly these keys:
 {
-  "description": "2-3 precise sentences. Name specific symbols by their correct name.",
+  "description": "2-3 sentences. Express confidence. Use 'appears to be', 'likely', 'possibly', 'might be' for uncertain items.",
   "latex": "LaTeX if a math expression is clearly visible, otherwise null",
-  "content_type": "specific label, e.g. 'AND gate', 'quadratic equation', 'free body diagram', 'XOR gate'",
+  "content_type": "label OR 'uncertain: could be X or Y' if ambiguous",
+  "confidence": 0.0 to 1.0 (how sure you are about the entire scene),
+  "ambiguities": ["list any confusing/ambiguous elements"],
   "elements": [
-    {"label": "exact name of element", "detail": "any relevant detail or null"}
+    {"label": "exact name or 'possible X or Y' if unclear", "confidence": 0.0-1.0, "detail": "any relevant detail or null"}
   ]
 }
 
 Rules:
-- If you see a logic gate, name the exact gate type. Do not generalise as 'gate' or 'shape'.
-- If you see a math expression, capture it exactly in the latex field.
-- description must be specific — not vague. Bad: "some shapes". Good: "An AND gate with two inputs and one output."
-- description and element labels must be plain English prose — no LaTeX, no dollar signs, no backslashes.
+- NEVER assume a shape is a logic gate unless you clearly see inputs, outputs, and the characteristic gate shape.
+- A rectangle with right angles is just a rectangle, NOT an OR gate.
+- If you see a logic gate, name the EXACT gate type only if confident. Otherwise say 'possible [gate type]'.
+- If you see a math expression, capture it ONLY if clearly visible. Otherwise note the ambiguity.
+- description must express appropriate uncertainty. Bad: 'This is an OR gate'. Good: 'This appears to be a rectangle, but could possibly be an OR gate if the curved side is intentional.'
+- Confidence scores must be realistic (0.3-0.5 for ambiguous items, 0.8+ only for clear cases).
+- Always list ambiguities — don't hide them.
 - Do NOT output coordinates. Output raw JSON only. No markdown fences.
 """
 
 SOLVE_PROMPT = """\
-You are Echo, a friendly AI tutor. Someone drew something on a whiteboard and you have been given a description of it. Respond naturally and helpfully.
+You are Echo, a friendly AI tutor. Answer concisely based on the drawing description.
 
-Pick the response style that fits the content — do NOT default to steps for everything:
-- Simple concept, logic gate, symbol, diagram → a natural conversational paragraph or two
-- Multi-step algebraic problem, proof, derivation → numbered steps make sense
-- Quick factual answer → one or two sentences is enough
+RESPONSE FORMAT — follow strictly:
+- Simple identification/conceptual (shape, symbol, logic gate, "what is this?"): 1 sentence prose. E.g. "Yes! That's a right triangle. **Right triangle**"
+- Calculation or value-finding (area, solve for x, derivative): prose with bold answer. E.g. "Area = length × width. **Area = 25 cm²**"
+- Complex derivation (multi-step solving, proofs, integrations): numbered steps with equations in every step, then bold final answer in last step.
 
-Honour the recognized content exactly. Do not reinterpret it.
+FOR MATH DERIVATIONS — accuracy is critical:
+- Show every step clearly with the correct mathematical operation/rule applied.
+- For integrals: show the integrand, apply integration rules, include the constant of integration.
+- For derivatives: apply derivative rules step-by-step (power rule, chain rule, product rule, etc.).
+- For equations: show operations applied to both sides equally.
+- Verify: mentally check each step makes sense before outputting.
+- Put the final simplified/solved result in bold.
 
-Output JSON in one of these two forms:
+CONFIDENCE TONE:
+- If scene_confidence ≥ 0.45: just answer directly. NO preamble about confidence.
+- If scene_confidence < 0.45: 1 natural sentence like "Not totally sure, but..." before the answer.
 
-Natural prose (use this most of the time):
-{ "text": "Your natural response here.", "steps": null }
+GOAL INFERENCE (when no follow-up question) — MANDATORY:
+- ALWAYS infer what the user wants based on content_type and elements.
+- Common inferences: "solve for x", "find area", "simplify", "truth table", "derivative", etc.
+- Do not ask or explain — immediately solve it.
+- If it's a derivation/multi-step math: use numbered steps with equations.
+- If it's conceptual/simple: use prose with bold answer.
 
-Numbered steps (only for genuinely multi-step math problems):
-{ "text": null, "steps": [{ "stepNumber": 1, "explanation": "plain English", "equation": "LaTeX or null" }] }
+BOLD ANSWER — ABSOLUTELY MANDATORY, EVERY SINGLE RESPONSE, NO EXCEPTIONS:
+- ALWAYS end with the solution/result bolded on its own line: **e^x** or **x = 5** or **Area = 25 cm²**
+- The bold answer is the final solution to the problem.
+- For steps: put the bold answer in the last step's explanation.
+- NEVER skip this. Every response must have a bolded answer.
+
+OUTPUT FORMATS:
+
+Prose (short answers):
+{ "text": "Your concise response.", "steps": null }
+
+Steps (only for genuinely multi-step problems):
+{ "text": null, "steps": [{ "stepNumber": 1, "explanation": "short plain English", "equation": "LaTeX — required for every step with math" }] }
 
 Rules:
-- text and explanation must be plain English — no dollar signs, no LaTeX, no backslashes.
-- Put math notation only in the equation fields.
-- Never force steps when a natural sentence or paragraph is more appropriate.
-- Output raw JSON only. No markdown.
+- text and explanation: plain English only, no dollar signs, no LaTeX, no backslashes.
+- Math notation: equation fields only.
+- For steps: EVERY step involving math MUST have an equation field populated. Do not skip equations.
+- Be terse. A 1-sentence answer is better than a paragraph.
+- Output raw JSON only. No markdown fences.
 """
 
 
@@ -145,6 +197,8 @@ def recognize_image_semantic(
         "latex": parsed.get("latex"),
         "content_type": str(parsed.get("content_type") or "unknown"),
         "elements": parsed.get("elements") or [],
+        "confidence": float(parsed.get("confidence") or 0.5),
+        "ambiguities": parsed.get("ambiguities") or [],
     }
 
 
@@ -156,8 +210,9 @@ def recognize_image(image_base64: str) -> dict:
 
 def solve_problem(recognition: dict, question: str | None = None) -> dict:
     client = get_client()
+    confidence = recognition.get("confidence", 0.5)
     context = json.dumps(recognition, indent=2)
-    user_msg = f"Problem:\n{context}"
+    user_msg = f"scene_confidence: {confidence:.2f}\n\nProblem:\n{context}"
     if question:
         user_msg += f"\n\nFollow-up: {question}"
 

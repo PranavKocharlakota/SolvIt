@@ -2,13 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import "./Solvit.css";
 import "katex/dist/katex.min.css";
 import katex from "katex";
+import LandingPage from "./LandingPage";
 
 import type { BoardMode, ToolId, BrushId, HighlighterId, ShapeId } from "./types";
 import { TOOLS, SIDE_ICONS, COLORS, HIGHLIGHTERS, BOARD_MODES, SHAPES } from "./constants";
 import { useBoard, getBoardStyles } from "./useBoard";
 import {
-  BoardPreview, ZoomBtn, ITBtn,
-  ClearModal, NotebookLines,
+  BoardPreview, ClearModal, NotebookLines,
 } from "./components";
 import SolvitCanvas, { SolvitCanvasHandle } from "./SolvitCanvas";
 import { describeDrawing, recognizeDrawing, solveProblem } from "../lib/api";
@@ -28,6 +28,29 @@ function now() {
 }
 
 export default function Solvit() {
+  const [showLanding, setShowLanding] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleEnterApp = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setShowLanding(false);
+      setIsExiting(false);
+    }, 600);
+  };
+
+  if (showLanding) {
+    return (
+      <div className={isExiting ? "landing-page exit" : ""}>
+        <LandingPage onEnter={handleEnterApp} />
+      </div>
+    );
+  }
+
+  return <SolvitApp />;
+}
+
+function SolvitApp() {
   /* ── Tool / board state ────────────────────────────────── */
   const [activeTool,       setActiveTool]       = useState<ToolId>("pen");
   const [activeSide,       setActiveSide]       = useState("brush");
@@ -37,7 +60,6 @@ export default function Solvit() {
   const [boardMode,        setBoardMode]        = useState<BoardMode>("chalkboard");
   const [strokeSize,       setStrokeSize]       = useState(4);
   const [opacity,          setOpacity]          = useState(100);
-  const [zoom,             setZoom]             = useState(100);
   const [showClearConfirm,  setShowClearConfirm]  = useState(false);
   const [showToolPanel,     setShowToolPanel]     = useState(true);
   const [showShapesPicker,  setShowShapesPicker]  = useState(false);
@@ -107,9 +129,8 @@ export default function Solvit() {
 
   /* ── Derived canvas props ──────────────────────────────── */
   const canvasTool = (
-    activeTool === "eraser" ? "eraser" :
-    activeTool === "text"   ? "text"   : "pen"
-  ) as "pen" | "eraser" | "text";
+    activeTool === "eraser" ? "eraser" : "pen"
+  ) as "pen" | "eraser";
   const dotSize    = Math.min(strokeSize * 2, 30);
 
   // Effective drawing properties (highlighter / marker override base values)
@@ -140,27 +161,45 @@ export default function Solvit() {
   /* ── Recognize + Solve ─────────────────────────────────── */
   const handleSolve = useCallback(async () => {
     if (!canvasRef.current) return;
+    const delta = canvasRef.current.getStrokeDelta();
+    const hasDelta = delta && (delta.newStrokeCount > 0 || delta.removedStrokeCount > 0);
+
+    // If nothing changed, skip re-recognizing and just solve with cached recognition
+    if (!hasDelta && recognition) {
+      setLoading(l => ({ ...l, solve: true }));
+      const answer = await solveProblem(recognition);
+      setLoading(l => ({ ...l, solve: false }));
+      setMessages(m => [...m, {
+        role: "ai",
+        text: answer.text ?? undefined,
+        steps: answer.steps ?? undefined,
+        time: now(),
+      }]);
+      scrollChat();
+      return;
+    }
+
     const imageBase64   = canvasRef.current.getImageBase64();
     const strokes       = canvasRef.current.exportStrokesForAPI();
-    const delta         = canvasRef.current.getStrokeDelta();
 
     try {
       setLoading(l => ({ ...l, recognize: true }));
       setMessages(m => [...m, { role: "ai", text: "Analyzing your drawing…", time: now() }]);
       scrollChat();
 
-      const result = await recognizeDrawing(imageBase64, strokes, delta);
+      const result = await recognizeDrawing(imageBase64, strokes, hasDelta ? delta : undefined);
       setRecognition(result);
       canvasRef.current.markRecognized();
       setLoading(l => ({ ...l, recognize: false, solve: true }));
 
-      setMessages(m => [...m, {
-        role: "ai",
-        recognition: result,
-        text: result.description,
-        time: now(),
-      }]);
-      scrollChat();
+      if (result.latex) {
+        setMessages(m => [...m, {
+          role: "ai",
+          recognition: result,
+          time: now(),
+        }]);
+        scrollChat();
+      }
 
       const answer = await solveProblem(result);
       setLoading(l => ({ ...l, solve: false }));
@@ -219,11 +258,6 @@ export default function Solvit() {
     }
   }, [input, recognition, handleSolve, scrollChat]);
 
-  /* ── Write formula to canvas ──────────────────────────── */
-  const handleWriteFormula = useCallback((latex: string) => {
-    canvasRef.current?.writeFormula(latex);
-  }, []);
-
   /* ── Undo / Redo / Clear ───────────────────────────────── */
   const handleUndo  = () => canvasRef.current?.undo();
   const handleRedo  = () => canvasRef.current?.redo();
@@ -242,7 +276,7 @@ export default function Solvit() {
             key={t.id}
             title={t.title}
             className={`tb-btn${activeTool === t.id ? " active" : ""}`}
-            onClick={() => { setActiveTool(t.id); if (t.id === 'text') setActiveShape(null); }}
+            onClick={() => setActiveTool(t.id)}
           >
             {t.icon}
           </button>
@@ -271,6 +305,7 @@ export default function Solvit() {
           className="share-btn"
           onClick={handleSolve}
           disabled={loading.recognize || loading.solve}
+          title="Updates the AI's context to your current drawing"
         >
           {loading.recognize ? "Reading…" : loading.solve ? "Solving…" : "Solve ✦"}
         </button>
@@ -290,9 +325,16 @@ export default function Solvit() {
                   if (s.id === "brush") {
                     setShowToolPanel(p => !p);
                     setShowShapesPicker(false);
-                    setActiveShape(null); // back to freehand
+                    setActiveShape(null);
+                    setActiveTool("pen");
+                  } else if (s.id === "eraser") {
+                    setActiveTool("eraser");
+                    setShowToolPanel(false);
+                    setShowShapesPicker(false);
+                    setActiveShape(null);
                   } else if (s.id === "shapes") {
                     setShowShapesPicker(p => !p);
+                    setActiveTool("pen");
                   }
                 }}
               >
@@ -325,15 +367,24 @@ export default function Solvit() {
         <div>
           <span className="tp-label">Brush</span>
           <div className="brush-row">
-            {(["pen", "marker"] as BrushId[]).map(id => (
+            {(["pen", "marker", "eraser"] as (BrushId | "eraser")[]).map(id => (
               <button
                 key={id}
-                className={`brush-btn${activeBrush === id ? " active" : ""}`}
-                onClick={() => setActiveBrush(id)}
+                className={`brush-btn${(id === "eraser" ? activeTool === "eraser" : activeTool !== "eraser" && activeBrush === id) ? " active" : ""}`}
+                onClick={() => {
+                  if (id === "eraser") {
+                    setActiveTool("eraser");
+                  } else {
+                    setActiveBrush(id as BrushId);
+                    setActiveTool("pen");
+                  }
+                }}
               >
                 {id === "pen"
                   ? <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-                  : <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><rect x="2" y="7" width="20" height="10" rx="3"/></svg>
+                  : id === "marker"
+                  ? <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><rect x="2" y="7" width="20" height="10" rx="3"/></svg>
+                  : <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M3 19l16-16M9 3L3 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-6-6z"/></svg>
                 }
                 {id.charAt(0).toUpperCase() + id.slice(1)}
               </button>
@@ -443,15 +494,9 @@ export default function Solvit() {
           strokeWidth={effectiveWidth}
           opacity={effectiveOpacity}
           shape={activeShape}
+          boardMode={boardMode}
           onLiveUpdate={handleLiveUpdate}
         />
-
-        <div className="zoom-bar">
-          <ZoomBtn label="−" onClick={() => setZoom(z => Math.max(25,  z - 25))} />
-          <span className="zoom-value">{zoom}%</span>
-          <ZoomBtn label="+" onClick={() => setZoom(z => Math.min(200, z + 25))} />
-          <ZoomBtn label="Fit" onClick={() => setZoom(100)} small />
-        </div>
 
         {showClearConfirm && (
           <ClearModal
@@ -479,22 +524,14 @@ export default function Solvit() {
 
         <div className="ai-messages">
           {messages.map((m, i) => (
-            <EchoMessage key={i} msg={m} onWriteFormula={handleWriteFormula} />
+            <EchoMessage key={i} msg={m} />
           ))}
           <div ref={chatEndRef} />
-        </div>
-
-        <div className="chips">
-          {["Step by step", "Simplify", "Formula", "Verify"].map(c => (
-            <div key={c} className="chip" onClick={() => setInput(c)}>{c}</div>
-          ))}
         </div>
 
         <form className="ai-input-area" onSubmit={handleSend}>
           <div className="input-label">— notes to Echo —</div>
           <div className="input-tools">
-            <ITBtn icon={<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>} />
-            <ITBtn icon={<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>} />
             <span className="sel-indicator">{recognition ? recognition.content_type : "nothing recognized yet"}</span>
           </div>
           <div className="input-row">
@@ -528,6 +565,15 @@ function cleanText(text: string): string {
     .trim();
 }
 
+function renderBold(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    /^\*\*[^*]+\*\*$/.test(part)
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 /* ── Math renderer ─────────────────────────────────────── */
 function MathBlock({ latex, display = false }: { latex: string; display?: boolean }) {
   let html = "";
@@ -545,22 +591,17 @@ function MathBlock({ latex, display = false }: { latex: string; display?: boolea
 }
 
 /* ── Echo message renderer ─────────────────────────────── */
-function EchoMessage({ msg, onWriteFormula }: { msg: EchoMsg; onWriteFormula?: (latex: string) => void }) {
+function EchoMessage({ msg }: { msg: EchoMsg }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const isUser = msg.role === "user";
 
   return (
     <div className={`msg ${isUser ? "user" : "ai"}`}>
-      {msg.text && <div className="bubble">{cleanText(msg.text)}</div>}
+      {msg.text && <div className="bubble">{renderBold(cleanText(msg.text))}</div>}
 
       {msg.recognition?.latex && (
         <div className="math-block-wrap">
           <MathBlock latex={msg.recognition.latex} display />
-          {onWriteFormula && (
-            <button className="write-btn" onClick={() => onWriteFormula(msg.recognition!.latex!)}>
-              ✍ Write to board
-            </button>
-          )}
         </div>
       )}
 
@@ -580,15 +621,10 @@ function EchoMessage({ msg, onWriteFormula }: { msg: EchoMsg; onWriteFormula?: (
               </button>
               {expanded === step.stepNumber && (
                 <div className="step-body">
-                  <p>{cleanText(step.explanation)}</p>
+                  <p>{renderBold(cleanText(step.explanation))}</p>
                   {step.equation && (
                     <div className="math-block-wrap">
                       <MathBlock latex={step.equation} display />
-                      {onWriteFormula && (
-                        <button className="write-btn" onClick={() => onWriteFormula(step.equation!)}>
-                          ✍ Write to board
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>

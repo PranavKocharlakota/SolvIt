@@ -15,6 +15,8 @@ class RecognitionResult(BaseModel):
     latex: Optional[str] = None          # only set if a clear equation is visible
     content_type: str = "unknown"        # free text: "flowchart", "math equation", etc.
     elements: list[RecognizedElement] = []
+    confidence: Optional[float] = None   # 0.0 to 1.0: how confident the model is about the scene
+    ambiguities: list[str] = []          # list of confusing or ambiguous elements observed
 
 
 # ── Stroke input ──────────────────────────────────────────────────────────────

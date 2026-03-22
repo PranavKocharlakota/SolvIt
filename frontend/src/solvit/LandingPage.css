@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@700&display=swap');
+
+.landing-page {
+  background: #3a4a3a;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  overflow: hidden;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.scratch-svg,
+.doodle-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.scratch-svg {
+  z-index: 0;
+}
+.doodle-svg {
+  z-index: 1;
+}
+
+.corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  opacity: 0.3;
+  z-index: 2;
+}
+.corner.tl {
+  top: 22px;
+  left: 22px;
+  border-top: 2px solid #fdf9f0;
+  border-left: 2px solid #fdf9f0;
+}
+.corner.tr {
+  top: 22px;
+  right: 22px;
+  border-top: 2px solid #fdf9f0;
+  border-right: 2px solid #fdf9f0;
+}
+.corner.bl {
+  bottom: 22px;
+  left: 22px;
+  border-bottom: 2px solid #fdf9f0;
+  border-left: 2px solid #fdf9f0;
+}
+.corner.br {
+  bottom: 22px;
+  right: 22px;
+  border-bottom: 2px solid #fdf9f0;
+  border-right: 2px solid #fdf9f0;
+}
+
+.landing-content {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 0 60px;
+  animation: slideUp 0.9s ease-out 0.2s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.landing-title {
+  font-family: 'Kalam', cursive;
+  font-size: 90px;
+  font-weight: 700;
+  color: #f0ead8;
+  line-height: 1;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.28);
+  margin: 0;
+  animation: titleBounce 1s ease-out 0.4s both;
+}
+
+@keyframes titleBounce {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotateZ(-5deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateZ(0deg);
+  }
+}
+
+.pen-icon {
+  font-size: 50px;
+  line-height: 1;
+  margin-top: -4px;
+  filter: drop-shadow(1px 2px 4px rgba(0, 0, 0, 0.35));
+  user-select: none;
+  animation: penTwirl 1.2s ease-out 0.5s both;
+}
+
+@keyframes penTwirl {
+  from {
+    opacity: 0;
+    transform: rotate(-180deg) scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.underline-svg {
+  display: block;
+  margin-top: 2px;
+  animation: drawUnderline 1s ease-out 0.6s both;
+}
+
+@keyframes drawUnderline {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.landing-desc {
+  font-family: 'Kalam', cursive;
+  font-size: 21px;
+  font-weight: 700;
+  color: #e8e4c2;
+  letter-spacing: 0.5px;
+  line-height: 1.75;
+  max-width: 460px;
+  animation: fadeInText 1s ease-out 0.7s both;
+}
+
+@keyframes fadeInText {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.landing-cta {
+  margin-top: 6px;
+  padding: 13px 48px;
+  background: transparent;
+  border: 3.5px solid rgba(240, 234, 216, 0.85);
+  border-radius: 4px;
+  color: #f0ead8;
+  font-family: 'Kalam', cursive;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow:
+    0 0 10px rgba(240, 234, 216, 0.3),
+    0 0 22px rgba(240, 234, 216, 0.15),
+    0 0 40px rgba(240, 234, 216, 0.08);
+  animation: buttonFadeIn 1s ease-out 0.8s both;
+}
+
+@keyframes buttonFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.landing-cta:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(240, 234, 216, 1);
+  box-shadow:
+    0 0 14px rgba(240, 234, 216, 0.5),
+    0 0 30px rgba(240, 234, 216, 0.25),
+    0 0 55px rgba(240, 234, 216, 0.12);
+  transform: translateY(-2px);
+}
+
+.landing-cta:active {
+  transform: scale(0.97);
+}
+
+/* Transition to main app */
+.landing-page.exit {
+  animation: fadeOutPage 0.6s ease-in forwards;
+}
+
+@keyframes fadeOutPage {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}

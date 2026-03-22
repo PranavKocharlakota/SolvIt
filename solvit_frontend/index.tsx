@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import "./Solvit.css";
+import LandingPage from "./LandingPage";
 
 import type { BoardMode, ToolId, BrushId, HighlighterId } from "./types";
 import { TOOLS, SIDE_ICONS, COLORS, HIGHLIGHTERS, BOARD_MODES, DEMO_MESSAGES } from "./constants";
@@ -10,6 +11,29 @@ import {
 } from "./components";
 
 export default function Solvit() {
+  const [showLanding, setShowLanding] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleEnterApp = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setShowLanding(false);
+      setIsExiting(false);
+    }, 600);
+  };
+
+  if (showLanding) {
+    return (
+      <div className={isExiting ? "landing-page exit" : ""}>
+        <LandingPage onEnter={handleEnterApp} />
+      </div>
+    );
+  }
+
+  return <MainApp />;
+}
+
+function MainApp() {
   /* ── State ─────────────────────────────────────────────── */
   const [activeTool,        setActiveTool]        = useState<ToolId>("pen");
   const [activeSide,        setActiveSide]        = useState("brush");
@@ -293,3 +317,4 @@ export default function Solvit() {
     </div>
   );
 }
+

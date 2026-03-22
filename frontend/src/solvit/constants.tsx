@@ -19,10 +19,6 @@ export const TOOLS: ToolDef[] = [
     id: "pen", title: "Pen",
     icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>,
   },
-  {
-    id: "text", title: "Text",
-    icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>,
-  },
 ];
 
 export const SIDE_ICONS: SideIconDef[] = [
@@ -73,10 +69,4 @@ export const BOARD_MODES: BoardModeDef[] = [
   { id: "paper",      label: "Paper"      },
 ];
 
-export const DEMO_MESSAGES: Message[] = [
-  { role:"ai",   text:"Hi! I'm Echo. Highlight anything in red and I'll solve it.", time:"just now" },
-  { role:"user", text:"Solve u — projection of v onto x-axis. Also eigenvalues of the red matrix.", time:"12:04 pm" },
-  { role:"ai",   text:"Projection of v = (3,2) onto x-axis:", math:["u = (3, 0),  |u| = 3"], extra:"Eigenvalues of A:", math2:["det(A−λI)=0","(2−λ)(3−λ)=0","λ₁=2, λ₂=3"], time:"12:04 pm" },
-  { role:"user", text:"Draw u on the board!", time:"12:05 pm" },
-  { role:"ai",   text:"Drawing u = (3,0) as a green arrow now.", time:"12:05 pm" },
-];
+export const DEMO_MESSAGES: Message[] = [];

@@ -65,11 +65,12 @@ export interface SolvitCanvasHandle {
 }
 
 interface Props {
-  tool: 'pen' | 'eraser' | 'text';
+  tool: 'pen' | 'eraser';
   color: string;
   strokeWidth: number;
   opacity?: number;
   shape?: ShapeId | null;
+  boardMode?: 'chalkboard' | 'paper' | 'grid';
   onLiveUpdate?: (imageBase64: string) => void;
 }
 
@@ -81,24 +82,24 @@ function renderShape(el: ShapeElement) {
   const midY = (y1 + y2) / 2;
   const w = x2 - x1;
   const h = y2 - y1;
-  const common = { stroke: color, strokeWidth: width, opacity: opacity / 100, fill: 'transparent' as const };
+  const common = { stroke: color, strokeWidth: width, hitStrokeWidth: Math.max(20, width * 8), opacity: opacity / 100, fill: 'transparent' as const };
 
   switch (shapeType) {
     case 'circle':
-      return <Ellipse key={id} x={midX} y={midY} radiusX={Math.abs(w) / 2} radiusY={Math.abs(h) / 2} {...common} />;
+      return <Ellipse key={id} id={id} x={midX} y={midY} radiusX={Math.abs(w) / 2} radiusY={Math.abs(h) / 2} {...common} />;
     case 'rect':
-      return <Rect key={id} x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(w)} height={Math.abs(h)} {...common} />;
+      return <Rect key={id} id={id} x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(w)} height={Math.abs(h)} {...common} />;
     case 'triangle':
-      return <Line key={id} points={[midX, y1, x2, y2, x1, y2]} closed lineCap="round" lineJoin="round" {...common} />;
+      return <Line key={id} id={id} points={[midX, y1, x2, y2, x1, y2]} closed lineCap="round" lineJoin="round" {...common} />;
     case 'line':
-      return <Line key={id} points={[x1, y1, x2, y2]} lineCap="round" {...common} />;
+      return <Line key={id} id={id} points={[x1, y1, x2, y2]} lineCap="round" {...common} />;
     case 'arrow':
-      return <Arrow key={id} points={[x1, y1, x2, y2]} fill={color} stroke={color} strokeWidth={width} opacity={opacity / 100} pointerLength={12} pointerWidth={10} />;
+      return <Arrow key={id} id={id} points={[x1, y1, x2, y2]} fill={color} stroke={color} strokeWidth={width} opacity={opacity / 100} pointerLength={12} pointerWidth={10} />;
     case 'diamond':
-      return <Line key={id} points={[midX, y1, x2, midY, midX, y2, x1, midY]} closed lineCap="round" lineJoin="round" {...common} />;
+      return <Line key={id} id={id} points={[midX, y1, x2, midY, midX, y2, x1, midY]} closed lineCap="round" lineJoin="round" {...common} />;
     case 'star': {
       const outerR = Math.max(4, Math.min(Math.abs(w), Math.abs(h)) / 2);
-      return <Star key={id} x={midX} y={midY} numPoints={5} innerRadius={outerR * 0.4} outerRadius={outerR} {...common} />;
+      return <Star key={id} id={id} x={midX} y={midY} numPoints={5} innerRadius={outerR * 0.4} outerRadius={outerR} {...common} />;
     }
     default:
       return null;
@@ -108,7 +109,7 @@ function renderShape(el: ShapeElement) {
 /* ── Component ────────────────────────────────────────────── */
 
 const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
-  ({ tool, color, strokeWidth, opacity = 100, shape = null, onLiveUpdate }, ref) => {
+  ({ tool, color, strokeWidth, opacity = 100, shape = null, boardMode = 'chalkboard', onLiveUpdate }, ref) => {
     const stageRef      = useRef<Konva.Stage>(null);
     const containerRef  = useRef<HTMLDivElement>(null);
     const [size, setSize]         = useState({ width: 800, height: 600 });
@@ -198,9 +199,9 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
       const pos = stageRef.current?.getPointerPosition();
       if (!pos) return;
 
-      if (tool === 'text') {
-        hasCommitted.current = false;
-        setEditing({ x: pos.x, y: pos.y, value: '' });
+      if (tool === 'eraser') {
+        isDown.current = true;
+        currentEl.current = { kind: 'stroke', id: 'eraser', points: [pos.x, pos.y], color: '', width: 0, tool: 'eraser', opacity: 0 } as any;
         return;
       }
 
@@ -230,6 +231,30 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
       const pos = stageRef.current?.getPointerPosition();
       if (!pos) return;
 
+      if (tool === 'eraser') {
+        const eraserRadius = strokeWidth * 4;
+        setElements(prev => {
+          const copy = [...prev];
+          // Remove any element that intersects with eraser circle at current pos
+          return copy.filter(el => {
+            if (el.kind === 'stroke') {
+              const points = flatToPoints(el.points);
+              for (const pt of points) {
+                const dist = Math.sqrt((pt.x - pos.x) ** 2 + (pt.y - pos.y) ** 2);
+                if (dist < eraserRadius) return false; // element hit, remove it
+              }
+              return true;
+            } else if (el.kind === 'shape') {
+              const els = el as ShapeElement;
+              const dist = Math.sqrt((((els.x1 + els.x2) / 2) - pos.x) ** 2 + (((els.y1 + els.y2) / 2) - pos.y) ** 2);
+              return dist > eraserRadius;
+            }
+            return true;
+          });
+        });
+        return;
+      }
+
       if (currentEl.current.kind === 'shape') {
         currentEl.current = { ...(currentEl.current as ShapeElement), x2: pos.x, y2: pos.y };
       } else {
@@ -243,11 +268,21 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
         return copy;
       });
       scheduleLiveUpdate();
-    }, [scheduleLiveUpdate]);
+    }, [scheduleLiveUpdate, tool, strokeWidth]);
 
     const handlePointerUp = useCallback(() => {
       if (!isDown.current || !currentEl.current) return;
       isDown.current = false;
+
+      if (tool === 'eraser') {
+        setElements(prev => {
+          history.push(prev);
+          return prev;
+        });
+        currentEl.current = null;
+        scheduleLiveUpdate();
+        return;
+      }
 
       let finalEl: DrawElement;
       if (currentEl.current.kind === 'stroke') {
@@ -266,7 +301,7 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
       });
       currentEl.current = null;
       scheduleLiveUpdate();
-    }, [history, scheduleLiveUpdate]);
+    }, [history, scheduleLiveUpdate, tool]);
 
     /* ── Imperative handle ────────────────────────────────── */
 
@@ -343,11 +378,12 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
       },
     }), [elements, size, history]);
 
-    const cursor = tool === 'eraser' ? 'cell' : tool === 'text' ? 'text' : 'crosshair';
+    const isLightBg = boardMode === 'paper' || boardMode === 'grid';
+    const cursor = tool === 'eraser' ? 'pointer' : isLightBg ? 'copy' : 'crosshair';
     const fontSize = Math.max(12, 10 + strokeWidth * 2);
 
     return (
-      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
         <Stage
           ref={stageRef}
           width={size.width}
@@ -364,9 +400,11 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
                 return (
                   <Line
                     key={el.id}
+                    id={el.id}
                     points={el.points}
                     stroke={el.color}
                     strokeWidth={el.tool === 'eraser' ? el.width * 4 : el.width}
+                    hitStrokeWidth={Math.max(20, el.width * 8)}
                     lineCap="round"
                     lineJoin="round"
                     tension={0.4}
@@ -379,6 +417,7 @@ const SolvitCanvas = forwardRef<SolvitCanvasHandle, Props>(
                 return (
                   <Text
                     key={el.id}
+                    id={el.id}
                     x={el.x}
                     y={el.y}
                     text={el.text}
