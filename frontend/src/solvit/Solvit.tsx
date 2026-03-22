@@ -155,7 +155,12 @@ function SolvitApp() {
 
   /* ── Scroll Echo to bottom ─────────────────────────────── */
   const scrollChat = useCallback(() => {
-    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    setTimeout(() => {
+      const container = chatEndRef.current?.parentElement;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }, 50);
   }, []);
 
   /* ── Recognize + Solve ─────────────────────────────────── */
