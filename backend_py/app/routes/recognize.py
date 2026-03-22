@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import RecognizeRequest, RecognitionResult
-from app.ai.groq_client import recognize_image_semantic
+from app.ai.groq_client import recognize_image_semantic, describe_image
 from app.ai.stroke_processor import preprocess_strokes, extract_geometry
 
 router = APIRouter()
@@ -34,6 +34,13 @@ async def recognize(req: RecognizeRequest):
 
         # Stage B: vision model semantic analysis
         result = recognize_image_semantic(raw_b64, stroke_summary, delta_context)
+
+        # Fallback: if semantic recognition failed, use live description
+        if result["description"] == "Unable to recognize.":
+            fallback_desc = describe_image(raw_b64)
+            if fallback_desc and fallback_desc != "Unable to recognize.":
+                result["description"] = fallback_desc
+
         return RecognitionResult(**result)
 
     except Exception as e:
