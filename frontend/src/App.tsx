@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
 import KonvaWhiteboard, { KonvaWhiteboardHandle } from './components/KonvaWhiteboard';
 import Sidebar from './components/Sidebar';
-import { describeDrawing, recognizeDrawing, solveProblem, drawStep as fetchDiagram } from './lib/api';
-import { Step, ChatMessage, DiagramType, RecognitionResult } from './lib/types';
+import { describeDrawing, recognizeDrawing, solveProblem } from './lib/api';
+import { Step, ChatMessage, RecognitionResult } from './lib/types';
 import './App.css';
 
 export default function App() {
@@ -19,7 +19,7 @@ export default function App() {
     try {
       const description = await describeDrawing(imageBase64);
       setLiveDescription(description);
-    } catch { /* silent — live updates are best-effort */ }
+    } catch { /* silent */ }
     finally { setLoading(l => ({ ...l, live: false })); }
   }, []);
 
@@ -42,6 +42,8 @@ export default function App() {
       setLoading(l => ({ ...l, solve: true }));
       const { steps: solvedSteps } = await solveProblem(result);
       setSteps(solvedSteps || []);
+      setLoading(l => ({ ...l, solve: false }));
+
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -55,23 +57,15 @@ export default function App() {
     setError(null);
     try {
       const { steps: newSteps } = await solveProblem(recognition, message);
-      setSteps(newSteps || []);
+      const resolved = newSteps || [];
+      setSteps(resolved);
       setChatMessages(msgs => [...msgs, {
         role: 'assistant',
-        content: `Updated the solution with ${newSteps?.length ?? 0} steps.`,
+        content: `Updated with ${resolved.length} step${resolved.length !== 1 ? 's' : ''}.`,
       }]);
     } catch (err: any) {
       setError(err.message || 'Chat error');
     }
-  }, [recognition]);
-
-  const handleDrawStep = useCallback((diagram: DiagramType) => {
-    canvasRef.current?.drawDiagram(diagram);
-  }, []);
-
-  const handleFetchDiagram = useCallback(async (stepDescription: string): Promise<DiagramType> => {
-    const ctx = canvasRef.current?.getStrokeContext();
-    return fetchDiagram(stepDescription, ctx, recognition);
   }, [recognition]);
 
   return (
@@ -85,8 +79,6 @@ export default function App() {
         error={error}
         onChatSubmit={handleChatSubmit}
         chatMessages={chatMessages}
-        onDrawStep={handleDrawStep}
-        onFetchDiagram={handleFetchDiagram}
       />
     </div>
   );

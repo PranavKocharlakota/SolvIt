@@ -1,35 +1,12 @@
 import React, { useState } from 'react';
-import { Step, DiagramType } from '../lib/types';
+import { Step } from '../lib/types';
 
 interface StepCardProps {
   step: Step;
-  onDrawStep: (diagram: DiagramType) => void;
-  onFetchDiagram: (stepDescription: string) => Promise<DiagramType>;
 }
 
-export default function StepCard({ step, onDrawStep, onFetchDiagram }: StepCardProps) {
+export default function StepCard({ step }: StepCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [drawError, setDrawError] = useState<string | null>(null);
-
-  const handleDraw = async () => {
-    setLoading(true);
-    setDrawError(null);
-    try {
-      // Always fetch a fresh diagram from the backend — never use step.diagram
-      // directly since the solve API may return legacy types the renderer can't use.
-      const diagram = await onFetchDiagram(step.explanation);
-      if (diagram) {
-        onDrawStep(diagram);
-      } else {
-        setDrawError('No diagram returned for this step.');
-      }
-    } catch (err: any) {
-      setDrawError(err.message || 'Failed to generate diagram');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div style={{
@@ -84,31 +61,9 @@ export default function StepCard({ step, onDrawStep, onFetchDiagram }: StepCardP
               fontFamily: 'monospace',
               fontSize: 13,
               color: '#7dd3fc',
-              marginBottom: 8,
             }}>
               {step.equation}
             </div>
-          )}
-          {(step.diagram || true) && (
-            <button
-              onClick={handleDraw}
-              disabled={loading}
-              style={{
-                background: loading ? '#334155' : '#0ea5e9',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 6,
-                padding: '6px 14px',
-                cursor: loading ? 'default' : 'pointer',
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              {loading ? 'Drawing...' : '🎨 Draw this step'}
-            </button>
-          )}
-          {drawError && (
-            <div style={{ color: '#fca5a5', fontSize: 11, marginTop: 6 }}>{drawError}</div>
           )}
         </div>
       )}

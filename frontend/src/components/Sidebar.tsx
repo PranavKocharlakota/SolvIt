@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Step, ChatMessage, DiagramType, RecognitionResult } from '../lib/types';
+import { Step, ChatMessage, RecognitionResult } from '../lib/types';
 import StepCard from './StepCard';
 
 interface SidebarProps {
@@ -10,12 +10,10 @@ interface SidebarProps {
   error: string | null;
   onChatSubmit: (msg: string) => void;
   chatMessages: ChatMessage[];
-  onDrawStep: (diagram: DiagramType) => void;
-  onFetchDiagram: (stepDescription: string) => Promise<DiagramType>;
 }
 
 export default function Sidebar({
-  recognition, liveDescription, steps, loading, error, onChatSubmit, chatMessages, onDrawStep, onFetchDiagram,
+  recognition, liveDescription, steps, loading, error, onChatSubmit, chatMessages,
 }: SidebarProps) {
   const [input, setInput] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -158,8 +156,6 @@ export default function Sidebar({
               <StepCard
                 key={step.stepNumber}
                 step={step}
-                onDrawStep={onDrawStep}
-                onFetchDiagram={onFetchDiagram}
               />
             ))}
           </div>

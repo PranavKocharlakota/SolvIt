@@ -67,23 +67,8 @@ class SolutionStep(BaseModel):
 
 
 class SolveResponse(BaseModel):
-    steps: list[SolutionStep]
-
-
-# ── Draw-step ─────────────────────────────────────────────────────────────────
-
-class StyleFeatures(BaseModel):
-    avgWidth: float = 3.0
-    dominantColor: str = "#000000"
-    avgCurvature: float = 1.0
-
-
-class DrawStepRequest(BaseModel):
-    stepDescription: str
-    styleFeatures: Optional[StyleFeatures] = None
-    strokeBounds: Optional[StrokeBounds] = None
-    strokeCount: int = 0
-    semanticScene: Optional[dict] = None  # serialised RecognitionResult
+    text: Optional[str] = None
+    steps: Optional[list[SolutionStep]] = None
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────

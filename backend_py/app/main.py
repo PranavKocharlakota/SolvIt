@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.routes import recognize, solve, draw_step, describe, ws
+from app.routes import recognize, solve, describe, ws
 
 app = FastAPI(title="Math Whiteboard AI", version="2.0.0")
 
@@ -22,7 +22,6 @@ app.add_middleware(
 app.include_router(recognize.router, prefix="/api")
 app.include_router(describe.router, prefix="/api")
 app.include_router(solve.router, prefix="/api")
-app.include_router(draw_step.router, prefix="/api")
 app.include_router(ws.router)
 
 

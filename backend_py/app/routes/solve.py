@@ -10,12 +10,14 @@ router = APIRouter()
 async def solve(req: SolveRequest):
     try:
         recognition_dict = req.recognition.model_dump(by_alias=True)
+
         result = solve_problem(recognition_dict, req.question)
-        steps = result.get("steps", [])
+        raw_steps = result.get("steps") or []
+        raw_steps = augment_steps_with_sympy(raw_steps, req.recognition.latex)
 
-        # Augment steps with SymPy symbolic verification
-        steps = augment_steps_with_sympy(steps, req.recognition.latex)
-
-        return SolveResponse(steps=[SolutionStep(**s) for s in steps])
+        return SolveResponse(
+            text=result.get("text") or None,
+            steps=[SolutionStep(**s) for s in raw_steps] if raw_steps else None,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

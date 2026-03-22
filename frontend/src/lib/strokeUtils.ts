@@ -1,6 +1,6 @@
-/** Client-side stroke utilities: simplification, style extraction, API formatting. */
+/** Client-side stroke utilities: simplification and API formatting. */
 
-import { StyleFeatures, StrokeBounds, ApiStroke } from './types';
+import { ApiStroke } from './types';
 
 interface Point { x: number; y: number; pressure?: number }
 
@@ -47,58 +47,6 @@ export function flatToPoints(flat: number[]): Point[] {
 /** Convert Point objects back to Konva flat array. */
 export function pointsToFlat(pts: Point[]): number[] {
   return pts.flatMap(p => [p.x, p.y]);
-}
-
-// ── Style feature extraction ──────────────────────────────────────────────────
-
-export function extractStyleFeatures(strokes: StrokeData[]): StyleFeatures {
-  const pen = strokes.filter(s => s.tool === 'pen');
-  if (pen.length === 0) return { avgWidth: 3, dominantColor: '#000000', avgCurvature: 1 };
-
-  const avgWidth = pen.reduce((s, st) => s + st.width, 0) / pen.length;
-
-  const colorCount: Record<string, number> = {};
-  for (const s of pen) colorCount[s.color] = (colorCount[s.color] || 0) + 1;
-  const dominantColor = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[0][0];
-
-  let totalCurv = 0, validN = 0;
-  for (const s of pen) {
-    const pts = flatToPoints(s.points);
-    if (pts.length < 2) continue;
-    let arc = 0;
-    for (let i = 1; i < pts.length; i++)
-      arc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-    const chord = Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y);
-    if (chord > 0) { totalCurv += arc / chord; validN++; }
-  }
-
-  return { avgWidth, dominantColor, avgCurvature: validN > 0 ? totalCurv / validN : 1 };
-}
-
-export function getStrokeBounds(
-  strokes: StrokeData[],
-  canvasWidth: number,
-  canvasHeight: number,
-): StrokeBounds | null {
-  const pen = strokes.filter(s => s.tool === 'pen');
-  if (pen.length === 0) return null;
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const s of pen) {
-    for (const p of flatToPoints(s.points)) {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
-    }
-  }
-
-  return {
-    normMinX: (minX / canvasWidth) * 100,
-    normMinY: (minY / canvasHeight) * 100,
-    normMaxX: (maxX / canvasWidth) * 100,
-    normMaxY: (maxY / canvasHeight) * 100,
-  };
 }
 
 // ── API format conversion ─────────────────────────────────────────────────────

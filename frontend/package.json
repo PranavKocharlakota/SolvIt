@@ -8,7 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "konva": "^10.2.3",
+    "katex": "^0.16.40",
+    "konva": "^9.3.22",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-konva": "^18.2.10"
